@@ -308,13 +308,26 @@ function PreviewBody({
     if (cat === "audio")
       return (
         <div className="flex h-full items-center justify-center bg-muted p-6">
-          <audio controls src={url} className="w-full max-w-xl" />
+          <audio
+            controls
+            controlsList="nodownload noplaybackrate"
+            onContextMenu={(e) => e.preventDefault()}
+            src={url}
+            className="w-full max-w-xl"
+          />
         </div>
       );
     if (cat === "video")
       return (
         <div className="flex h-full items-center justify-center bg-black p-6">
-          <video controls src={url} className="max-h-full max-w-full" />
+          <video
+            controls
+            controlsList="nodownload noremoteplayback noplaybackrate"
+            disablePictureInPicture
+            onContextMenu={(e) => e.preventDefault()}
+            src={url}
+            className="max-h-full max-w-full"
+          />
         </div>
       );
   }

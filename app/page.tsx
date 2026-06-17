@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Database, LogOut } from "lucide-react";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight, LogOut, PanelLeft } from "lucide-react";
 import type { FileItem } from "@/lib/types";
+import { basename } from "@/lib/format";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { FileBrowser } from "@/components/FileBrowser";
 import { Preview } from "@/components/Preview";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -13,6 +16,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 const BUCKET = process.env.NEXT_PUBLIC_R2_BUCKET ?? "neuro-awign-approved";
@@ -61,33 +70,67 @@ async function logout() {
 export default function Home() {
   const [prefix, setPrefix] = useState("");
   const [selected, setSelected] = useState<FileItem | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
-
-  const isMobile = () =>
-    typeof window !== "undefined" &&
-    window.matchMedia("(max-width: 767px)").matches;
+  const [collapsed, setCollapsed] = useState(false); // desktop rail
+  const [mobileOpen, setMobileOpen] = useState(false); // mobile sheet
+  const isMobile = useIsMobile();
 
   function handleSelect(file: FileItem) {
     setSelected(file);
-    // On phones the expanded sidebar overlays content — collapse to the rail
-    // so the preview is visible.
-    if (isMobile()) setCollapsed(true);
+    if (isMobile) setMobileOpen(false); // reveal the preview behind the sheet
   }
+
+  const currentLabel = prefix ? basename(prefix) : BUCKET;
+
+  const browser = (
+    <FileBrowser
+      prefix={prefix}
+      onNavigate={setPrefix}
+      selectedKey={selected?.key ?? null}
+      onSelect={handleSelect}
+      collapsed={!isMobile && collapsed}
+      onExpand={() => setCollapsed(false)}
+    />
+  );
 
   return (
     <AuthGate>
       <div className="flex h-full flex-col bg-background text-foreground">
         <header className="flex items-center gap-2 border-b px-3 py-2.5 sm:gap-4 sm:px-4">
-          <div className="flex shrink-0 items-center gap-2">
-            <Database className="size-4 text-muted-foreground" />
-            <h1 className="text-sm font-semibold tracking-tight">
+          <Link
+            href="/"
+            onClick={() => {
+              setPrefix("");
+              setSelected(null);
+            }}
+            className="flex shrink-0 items-center gap-2"
+            aria-label="Dataset Viewer — go to home"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="Dataset Viewer"
+              className="size-6 rounded-[6px]"
+            />
+            <h1 className="hidden text-sm font-semibold tracking-tight sm:block">
               Dataset Viewer
             </h1>
-          </div>
+          </Link>
 
-          <div className="hidden h-5 w-px shrink-0 bg-border sm:block" />
+          {/* Mobile: a single toggle that opens the file browser sheet
+              (replaces the long breadcrumb path) */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setMobileOpen(true)}
+            className="flex min-w-0 flex-1 justify-start gap-2 md:hidden"
+          >
+            <PanelLeft className="size-4 shrink-0" />
+            <span className="truncate font-mono">{currentLabel}</span>
+          </Button>
 
-          <div className="min-w-0 flex-1 overflow-x-auto">
+          {/* Desktop: full breadcrumb path */}
+          <div className="hidden h-5 w-px shrink-0 bg-border md:block" />
+          <div className="hidden min-w-0 flex-1 overflow-x-auto md:block">
             <Breadcrumbs prefix={prefix} onNavigate={setPrefix} />
           </div>
 
@@ -112,54 +155,49 @@ export default function Home() {
         </header>
 
         <div className="relative flex min-h-0 flex-1">
-          {/* Backdrop (mobile only) when the sidebar is expanded as an overlay */}
-          {!collapsed && (
-            <div
-              className="absolute inset-0 z-30 bg-black/50 md:hidden"
-              onClick={() => setCollapsed(true)}
-              aria-hidden
-            />
+          {isMobile ? (
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+              <SheetContent side="left" className="flex flex-col gap-0 p-0">
+                <SheetHeader className="border-b p-3 pr-12">
+                  <SheetTitle className="text-sm">Files</SheetTitle>
+                </SheetHeader>
+                <div className="min-h-0 flex-1 bg-sidebar text-sidebar-foreground">
+                  {browser}
+                </div>
+              </SheetContent>
+            </Sheet>
+          ) : (
+            <aside
+              className={cn(
+                "relative z-40 flex shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground transition-[width] duration-200 ease-in-out",
+                collapsed ? "w-14" : "w-72",
+              )}
+            >
+              {/* Collapse / expand handle on the sidebar edge */}
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      onClick={() => setCollapsed((v) => !v)}
+                      aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                      className="absolute -right-3 top-3 z-50 flex size-6 cursor-pointer items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+                    />
+                  }
+                >
+                  {collapsed ? (
+                    <ChevronRight className="size-3.5" />
+                  ) : (
+                    <ChevronLeft className="size-3.5" />
+                  )}
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  {collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                </TooltipContent>
+              </Tooltip>
+
+              {browser}
+            </aside>
           )}
-
-          <aside
-            className={cn(
-              "relative z-40 flex shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground transition-[width] duration-200 ease-in-out",
-              collapsed
-                ? "w-14"
-                : "w-72 max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:shadow-xl",
-            )}
-          >
-            {/* Collapse / expand handle on the sidebar edge */}
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    onClick={() => setCollapsed((v) => !v)}
-                    aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                    className="absolute -right-3 top-3 z-50 flex size-6 cursor-pointer items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
-                  />
-                }
-              >
-                {collapsed ? (
-                  <ChevronRight className="size-3.5" />
-                ) : (
-                  <ChevronLeft className="size-3.5" />
-                )}
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                {collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              </TooltipContent>
-            </Tooltip>
-
-            <FileBrowser
-              prefix={prefix}
-              onNavigate={setPrefix}
-              selectedKey={selected?.key ?? null}
-              onSelect={handleSelect}
-              collapsed={collapsed}
-              onExpand={() => setCollapsed(false)}
-            />
-          </aside>
 
           <main className="min-w-0 flex-1">
             <Preview file={selected} />
