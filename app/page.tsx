@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, LogOut, PanelLeft } from "lucide-react";
 import type { FileItem } from "@/lib/types";
@@ -11,6 +11,10 @@ import { Preview } from "@/components/Preview";
 import { ModeToggle } from "@/components/mode-toggle";
 import { AuthGate } from "@/components/AuthGate";
 import { AutomationGuard } from "@/components/AutomationGuard";
+import {
+  DisclaimerDialog,
+  DISCLAIMER_ACK_KEY,
+} from "@/components/DisclaimerDialog";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -64,6 +68,11 @@ function Breadcrumbs({
 }
 
 async function logout() {
+  try {
+    sessionStorage.removeItem(DISCLAIMER_ACK_KEY);
+  } catch {
+    // ignore
+  }
   await fetch("/api/auth/logout", { method: "POST" });
   window.location.reload();
 }
@@ -74,6 +83,25 @@ export default function Home() {
   const [collapsed, setCollapsed] = useState(false); // desktop rail
   const [mobileOpen, setMobileOpen] = useState(false); // mobile sheet
   const isMobile = useIsMobile();
+  const autoOpened = useRef(false);
+
+  // On mobile the sidebar is hidden, so open the browser sheet automatically
+  // when there's nothing to preview yet — but only once the disclaimer has been
+  // acknowledged (otherwise the sheet would cover the disclaimer popup).
+  useEffect(() => {
+    if (isMobile && !selected && !autoOpened.current) {
+      let acked = false;
+      try {
+        acked = sessionStorage.getItem(DISCLAIMER_ACK_KEY) === "1";
+      } catch {
+        acked = true;
+      }
+      if (acked) {
+        autoOpened.current = true;
+        setMobileOpen(true);
+      }
+    }
+  }, [isMobile, selected]);
 
   function handleSelect(file: FileItem) {
     setSelected(file);
@@ -97,7 +125,15 @@ export default function Home() {
     <AutomationGuard>
       <AuthGate>
         <div className="flex h-full flex-col bg-background text-foreground">
-        <header className="flex items-center gap-2 border-b px-3 py-2.5 sm:gap-4 sm:px-4">
+          <DisclaimerDialog
+            onAcknowledge={() => {
+              if (isMobile && !selected) {
+                autoOpened.current = true;
+                setMobileOpen(true);
+              }
+            }}
+          />
+          <header className="flex items-center gap-2 border-b px-3 py-2.5 sm:gap-4 sm:px-4">
           <Link
             href="/"
             onClick={() => {
@@ -121,13 +157,16 @@ export default function Home() {
           {/* Mobile: a single toggle that opens the file browser sheet
               (replaces the long breadcrumb path) */}
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => setMobileOpen(true)}
-            className="flex min-w-0 flex-1 justify-start gap-2 md:hidden"
+            className="flex min-w-0 flex-1 justify-start gap-2 border md:hidden"
           >
             <PanelLeft className="size-4 shrink-0" />
             <span className="truncate font-mono">{currentLabel}</span>
+            <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+              Browse
+            </span>
           </Button>
 
           {/* Desktop: full breadcrumb path */}

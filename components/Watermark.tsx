@@ -14,7 +14,7 @@ export function Watermark() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-0 z-30 select-none opacity-[0.10]"
+      className="pointer-events-none absolute inset-0 z-30 select-none opacity-20"
       style={{ backgroundImage: BACKGROUND, backgroundRepeat: "repeat" }}
     />
   );
