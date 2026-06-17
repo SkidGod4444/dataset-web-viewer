@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DownloadButton } from "@/components/DownloadButton";
+import { Watermark } from "@/components/Watermark";
 import { cn } from "@/lib/utils";
 
 const TEXT_CAP = 2_000_000; // 2 MB cap for text-based previews
@@ -180,8 +181,9 @@ export function Preview({ file }: { file: FileItem | null }) {
   return (
     <div className="flex h-full flex-col">
       <PreviewHeader file={file} cat={cat} view={view} page={page} setPage={setPage} />
-      <div className="min-h-0 flex-1">
+      <div className="relative min-h-0 flex-1">
         <PreviewBody file={file} cat={cat} isDirect={isDirect} view={view} />
+        <Watermark />
       </div>
     </div>
   );
