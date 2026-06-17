@@ -153,7 +153,7 @@ export function FileBrowser({
                 <li key={folder}>
                   <Tooltip>
                     <TooltipTrigger
-                      aria-label={basename(folder)}
+                      aria-label={`${basename(folder)} folder`}
                       onClick={() => onNavigate(folder)}
                       className="flex size-9 cursor-pointer items-center justify-center rounded-md hover:bg-accent"
                     >

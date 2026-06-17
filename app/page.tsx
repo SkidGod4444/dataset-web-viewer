@@ -93,15 +93,21 @@ export default function Home() {
 
           <div className="flex shrink-0 items-center gap-1">
             <ModeToggle />
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Log out"
-              title="Log out"
-              onClick={logout}
-            >
-              <LogOut />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Log out"
+                    onClick={logout}
+                  />
+                }
+              >
+                <LogOut />
+              </TooltipTrigger>
+              <TooltipContent>Log out</TooltipContent>
+            </Tooltip>
           </div>
         </header>
 
