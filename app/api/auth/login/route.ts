@@ -6,13 +6,16 @@ import {
   SESSION_COOKIE,
   SESSION_MAX_AGE,
 } from "@/lib/auth";
-import { enforceBrowserOrigin } from "@/lib/guard";
+import { enforceBrowserOrigin, isAutomatedUserAgent } from "@/lib/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  // Block curl/script brute-forcing of the password in production.
+  // Block scripted/automation user agents and (in prod) non-browser origins.
+  if (isAutomatedUserAgent(request)) {
+    return NextResponse.json({ ok: false }, { status: 403 });
+  }
   const blocked = enforceBrowserOrigin(request);
   if (blocked) return blocked;
 

@@ -10,6 +10,7 @@ import { FileBrowser } from "@/components/FileBrowser";
 import { Preview } from "@/components/Preview";
 import { ModeToggle } from "@/components/mode-toggle";
 import { AuthGate } from "@/components/AuthGate";
+import { AutomationGuard } from "@/components/AutomationGuard";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -93,8 +94,9 @@ export default function Home() {
   );
 
   return (
-    <AuthGate>
-      <div className="flex h-full flex-col bg-background text-foreground">
+    <AutomationGuard>
+      <AuthGate>
+        <div className="flex h-full flex-col bg-background text-foreground">
         <header className="flex items-center gap-2 border-b px-3 py-2.5 sm:gap-4 sm:px-4">
           <Link
             href="/"
@@ -203,7 +205,8 @@ export default function Home() {
             <Preview file={selected} />
           </main>
         </div>
-      </div>
-    </AuthGate>
+        </div>
+      </AuthGate>
+    </AutomationGuard>
   );
 }

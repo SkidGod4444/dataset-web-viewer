@@ -1,12 +1,22 @@
 import { isAuthenticated } from "./auth";
 
+// Non-browser / automation user agents. Real browsers never match these.
+// (Headless Chrome's *new* mode uses a normal UA, so this is a coarse layer —
+// the client-side AutomationGuard catches the webdriver flag too.)
+const AUTOMATION_UA =
+  /headlesschrome|phantomjs|slimerjs|selenium|webdriver|puppeteer|playwright|python-requests|python-urllib|curl\/|wget\/|scrapy|httpclient|java\/|go-http-client|node-fetch|axios|okhttp|libwww|lwp::|aiohttp|\bbot\b|crawler|spider/i;
+
+/** True when the request's User-Agent looks like a script/bot, not a browser. */
+export function isAutomatedUserAgent(request: Request): boolean {
+  const ua = request.headers.get("user-agent");
+  if (!ua) return true; // browsers always send a UA; missing => scripted
+  return AUTOMATION_UA.test(ua);
+}
+
 /**
  * Production-only origin check (defense-in-depth). Browsers attach fetch
  * metadata (`Sec-Fetch-Site`) and an `Origin`/`Referer` on same-origin
- * requests; command-line tools and bots don't. Returns a 403 Response when the
- * request doesn't look like it came from our own pages, else null.
- *
- * Used both to gate data routes and to blunt curl brute-forcing of the login.
+ * requests; command-line tools and bots don't.
  */
 export function enforceBrowserOrigin(request: Request): Response | null {
   if (process.env.NODE_ENV !== "production") return null;
@@ -33,15 +43,16 @@ export function enforceBrowserOrigin(request: Request): Response | null {
 
 /**
  * Gate for the data APIs:
- *  1. Authentication (always): a valid HMAC-signed session cookie is required.
- *     httpOnly + SameSite=Strict and unforgeable without the server secret, so
- *     `curl`/scripts without a real login get 401 — the actual access control.
- *  2. Origin check (production only): defense-in-depth on top of the cookie.
+ *  1. Reject automation/script user agents (all environments).
+ *  2. Require a valid HMAC-signed session cookie (the real access control).
+ *  3. Production-only origin check (defense-in-depth).
  *
  * Note: a browser viewer must hand bytes to the browser, so an authenticated
- * user can still extract data they can see. See README "Security".
+ * real user can still extract data they can see; stealth automation that forges
+ * a browser UA + has a valid session can also pass. See README "Security".
  */
 export function guardApiRequest(request: Request): Response | null {
+  if (isAutomatedUserAgent(request)) return forbidden();
   if (!isAuthenticated(request)) {
     return new Response("Unauthorized", {
       status: 401,
