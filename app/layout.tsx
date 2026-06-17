@@ -30,11 +30,7 @@ export const metadata: Metadata = {
     "Confidential dataset viewer for NEUROSCAPE Imaging Pvt. Ltd. — authorized, watermarked access only.",
   applicationName: "NEUROSCAPE Dataset Viewer",
   authors: [{ name: "NEUROSCAPE Imaging Pvt. Ltd." }],
-  icons: {
-    icon: "/logo.png",
-    shortcut: "/logo.png",
-    apple: "/logo.png",
-  },
+  // Favicon + apple-touch icon come from app/icon.png and app/apple-icon.png.
   // Confidential, access-controlled app — keep it out of search engines.
   robots: {
     index: false,
