@@ -1,0 +1,6 @@
+# Derived trajectories from the confidential NEUROSCAPE dataset — never commit.
+data/
+*.npy
+*.npz
+__pycache__/
+*.pyc

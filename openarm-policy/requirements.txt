@@ -1,0 +1,13 @@
+# OpenArm policy pipeline (Steps 2-5) — install on the H200 box, NOT the web-viewer laptop.
+# LeRobot pinned to 0.3.3: OpenArm's converter only emits LeRobotDataset v2.1.
+numpy>=1.26
+mujoco>=3.1
+opencv-python>=4.9
+pyarrow>=15
+torch>=2.2
+lerobot==0.3.3
+openarm-mujoco        # ships the OpenArm MJCF (Step 3)
+openarm-dataset        # OpenArmDataset format + lerobot_v2.1 converter (Step 4)
+# openarm_control (IK for Step 2) is installed from source:
+#   git clone https://github.com/enactic/openarm_control && pip install -e openarm_control
+# Stages 1 / 1.5 use bun + @aws-sdk/client-s3 from the dataset-web-viewer repo (no Python).
