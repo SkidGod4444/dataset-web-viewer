@@ -8,7 +8,6 @@ metadata:
 spec:
   restartPolicy: Never
 
-  # Stay on a DGX node that actually has H200s
   tolerations:
     - key: nvidia.com/gpu
       operator: Exists
@@ -16,13 +15,12 @@ spec:
 
   containers:
     - name: openarm-train
-      # NVIDIA-maintained PyTorch image — CUDA 12.x, Python 3.10, uv/pip ready
       image: nvcr.io/nvidia/pytorch:24.12-py3
       imagePullPolicy: IfNotPresent
 
-      # Keep the pod alive so you can exec in and run pipeline steps manually.
-      # Replace with your actual training command once data is staged:
-      #   command: ["bash", "openarm-policy/train_act.sh", "PICK_SMALL_OBJECTS"]
+      # Keep alive for interactive use — exec in and run pipeline steps manually.
+      # Swap for the real command once data is staged:
+      #   command: ["bash", "/home/dgx-gu-power/dataset-web-viewer/openarm-policy/train_act.sh", "PICK_SMALL_OBJECTS"]
       command: ["/bin/bash", "-c", "trap 'exit 0' SIGTERM; while true; do sleep 60; done"]
 
       resources:
@@ -42,49 +40,28 @@ spec:
           value: "0"
         - name: TORCH_NCCL_BLOCKING_WAIT
           value: "1"
-        # Point lerobot / HF cache somewhere on the PVC, not /root
         - name: HF_HOME
-          value: "/workspace/cache/huggingface"
+          value: "/home/dgx-gu-power/cache/huggingface"
         - name: TRANSFORMERS_CACHE
-          value: "/workspace/cache/huggingface"
+          value: "/home/dgx-gu-power/cache/huggingface"
 
       volumeMounts:
-        # Main workspace: code + data + checkpoints
-        - name: workspace
-          mountPath: /workspace
-        # /dev/shm for PyTorch DataLoader shared memory
+        - name: home
+          mountPath: /home/dgx-gu-power
         - name: dshm
           mountPath: /dev/shm
 
-      workingDir: /workspace
+      workingDir: /home/dgx-gu-power
 
   volumes:
-    # ---- persistent storage (edit claimName to match your PVC) ----
-    # Create the PVC first:
-    #   kubectl -n dgx-gu-power-restricted apply -f pvc.yaml
-    - name: workspace
-      persistentVolumeClaim:
-        claimName: openarm-workspace
+    # NFS home dir — same path as on the headnode, available on all DGX nodes
+    - name: home
+      hostPath:
+        path: /home/dgx-gu-power
+        type: Directory
 
-    # Shared memory: 32 Gi is enough headroom for multi-worker DataLoader
+    # Shared memory for PyTorch DataLoader multi-worker
     - name: dshm
       emptyDir:
         medium: Memory
         sizeLimit: 32Gi
-
----
-# PVC — create once, survives pod restarts
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: openarm-workspace
-  namespace: dgx-gu-power-restricted
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 500Gi
-  # Remove or change storageClassName to match what your cluster offers:
-  #   kubectl get storageclass
-  storageClassName: ""
