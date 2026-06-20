@@ -31,7 +31,7 @@ run on the H200 box). Only Step 7 (deploy) touches the real robot.
 
 **One-command driver:** `./run_pipeline.sh PICK_SMALL_OBJECTS` runs all stages; gate stages
 with `STAGES="1 1.5"` (laptop-side) or `STAGES="2 3 4"` (H200 box). Deps for Steps 2–5:
-`pip install -r openarm-policy/requirements.txt` (+ `openarm_control` from source).
+`uv pip install -r openarm-policy/requirements.txt` (+ `openarm_control` from source).
 
 ---
 
@@ -65,7 +65,7 @@ openarm-policy/             # box-side (Python + OpenArm stack)
 ```
 
 **Where each runs:** Steps 1–1.5 on the laptop (or any host with the R2 creds). Steps 2–7
-on the H200 box after `pip install -r openarm-policy/requirements.txt` + `openarm_control`.
+on the H200 box after `uv pip install -r openarm-policy/requirements.txt` + `openarm_control`.
 What I validated on real data vs. only syntax-checked (no MuJoCo/GPU here) is marked per step.
 
 ---
@@ -75,10 +75,11 @@ What I validated on real data vs. only syntax-checked (no MuJoCo/GPU here) is ma
 **Laptop (Steps 1–1.5):** just `bun` + the dataset-web-viewer repo's `.env.local` (R2 creds).
 Nothing to install.
 
-**H200 box (Steps 2–7):**
+**H200 box / Spark (Steps 2–7):**
 ```bash
-pip install -r openarm-policy/requirements.txt                # mujoco, lerobot==0.3.3, openarm-mujoco, openarm-dataset, …
-git clone https://github.com/enactic/openarm_control.git && pip install -e openarm_control   # IK — not on PyPI
+curl -LsSf https://astral.sh/uv/install.sh | sh && source $HOME/.local/bin/env   # install uv once
+uv pip install -r openarm-policy/requirements.txt             # mujoco, lerobot==0.3.3, openarm-mujoco, openarm-dataset, …
+git clone https://github.com/enactic/openarm_control.git && uv pip install -e openarm_control   # IK — not on PyPI
 openarm-mujoco-launch                                         # sanity-check the MJCF renders
 ```
 LeRobot is pinned to **0.3.3** — OpenArm's converter only emits LeRobotDataset v2.1.

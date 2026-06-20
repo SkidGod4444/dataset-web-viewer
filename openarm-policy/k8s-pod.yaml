@@ -18,9 +18,11 @@ spec:
       image: nvcr.io/nvidia/pytorch:24.12-py3
       imagePullPolicy: IfNotPresent
 
-      # Keep alive for interactive use — exec in and run pipeline steps manually.
-      # Swap for the real command once data is staged:
-      #   command: ["bash", "/home/dgx-gu-power/dataset-web-viewer/openarm-policy/train_act.sh", "PICK_SMALL_OBJECTS"]
+      # Keep alive for interactive use — exec in and run pipeline steps manually:
+      #   uv pip install -r dataset-web-viewer/openarm-policy/requirements.txt
+      #   bash dataset-web-viewer/openarm-policy/train_act.sh PICK_SMALL_OBJECTS
+      # Or swap command directly:
+      #   command: ["bash", "-c", "cd /home/dgx-gu-power/dataset-web-viewer && bash openarm-policy/train_act.sh PICK_SMALL_OBJECTS"]
       command: ["/bin/bash", "-c", "trap 'exit 0' SIGTERM; while true; do sleep 60; done"]
 
       resources:

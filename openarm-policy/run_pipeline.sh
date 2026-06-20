@@ -24,11 +24,11 @@ if has 1.5; then
 fi
 if has 2; then
   echo "== Stage 2: retarget -> OpenArm joint space (needs openarm_control) =="
-  python openarm-policy/retarget.py --in "${ROOT}/segments" --out "${ROOT}/retargeted" --arm auto
+  uv run python openarm-policy/retarget.py --in "${ROOT}/segments" --out "${ROOT}/retargeted" --arm auto
 fi
 if has 3; then
   echo "== Stage 3: MuJoCo replay + re-render -> OpenArmDataset (needs openarm_mujoco) =="
-  python openarm-policy/replay_sim.py --in "${ROOT}/retargeted" --out "${ROOT}" --randomize "${DR}"
+  uv run python openarm-policy/replay_sim.py --in "${ROOT}/retargeted" --out "${ROOT}" --randomize "${DR}"
 fi
 if has 4; then
   echo "== Stage 4: convert v2.1 + train ACT =="

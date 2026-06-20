@@ -20,7 +20,7 @@ uv run openarm-dataset-convert "${ROOT}/openarm_dataset" "${OUT}" \
 echo "[3/3] train ACT on $(nvidia-smi -L | wc -l) GPU(s)"
 # 2× H200 is wildly over-provisioned for ACT; single-GPU is fine. For multi-GPU:
 #   accelerate launch --multi_gpu $(command -v lerobot-train) ...
-lerobot-train \
+uv run lerobot-train \
   --dataset.repo_id="${REPO_ID}" \
   --dataset.root="${OUT}" \
   --policy.type=act \
