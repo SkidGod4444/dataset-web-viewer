@@ -51,6 +51,7 @@ openarm-policy/             # box-side (Python + OpenArm stack)
   retarget.py               # Step 2   EEF pose → OpenArm 16-DoF joints via IK
   replay_sim.py             # Step 3+4 MuJoCo replay + object weld + DR → OpenArmDataset
   replay_smoke_test.py      # render one episode → PNG contact sheet (run first on box)
+  view_sim.py               # watch the sim live (3D viewer) or export MP4
   train_act.sh              # Step 5   convert v2.1 + train ACT
   policy_server.py          # Step 7   serve ACT over OpenArm's socket contract
   data/<TASK>/              # generated, gitignored (derived from confidential data)
@@ -219,6 +220,27 @@ build-it-yourself gap:** only the *MuJoCo* inference dataflow ships. The real-ro
 swap `dora-openarm-mujoco` → `dora-openarm` (real follower, `--align-trigger gripper`) + real
 camera nodes → `dora-openarm-observer` → this server → `dora-openarm-actions-executor`.
 Verify the socket framing against `enactic/dora-openarm-inference/src/local_policy_server.py`.
+
+---
+
+## Watching the sim — how to actually see the robot
+
+Everything renders on the **H200 box** (MuJoCo), not the laptop. Ways to look, cheapest first:
+
+| Want | Command | Shows |
+|---|---|---|
+| Model loads OK? | `openarm-mujoco-launch` | OpenArm's own GUI (bare arm) |
+| Frame stills | `python openarm-policy/replay_smoke_test.py --synthetic` | PNG contact sheet (overview/wrist/ceiling) |
+| **Watch it move (live)** | `python openarm-policy/view_sim.py --synthetic` or `--in <retargeted>` | 3D window, orbit with the mouse |
+| Shareable clip | `python openarm-policy/view_sim.py --in <retargeted> --video out.mp4` | MP4 (headless-friendly) |
+| **Policy driving it** | Step 6 eval rollout | the trained ACT acting autonomously |
+
+Two different things you're watching:
+- **Replay** (`view_sim.py`, `replay_sim.py`) = the arm *retracing the human demos* (kinematic playback).
+- **Eval** (Step 6) = the trained policy *deciding for itself* — the real "robot working in sim".
+
+`view_sim.py`: `--in` with a dir picks the first segment; `--speed 0.5` slows it; `--loop`
+repeats. The live viewer needs a display; `--video` renders offscreen (works over SSH).
 
 ---
 
