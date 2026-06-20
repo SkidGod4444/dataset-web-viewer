@@ -67,29 +67,54 @@ def human_pose_to_robot_T(pos, quat):
     return T
 
 
+def _R_to_quat_wxyz(R):
+    """3×3 rotation matrix → quaternion [qw, qx, qy, qz] (openarm_control pose convention)."""
+    tr = R[0, 0] + R[1, 1] + R[2, 2]
+    if tr > 0:
+        s = 0.5 / np.sqrt(tr + 1.0)
+        return np.array([0.25 / s, (R[2, 1] - R[1, 2]) * s, (R[0, 2] - R[2, 0]) * s, (R[1, 0] - R[0, 1]) * s])
+    elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
+        s = 2.0 * np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2])
+        return np.array([(R[2, 1] - R[1, 2]) / s, 0.25 * s, (R[0, 1] + R[1, 0]) / s, (R[0, 2] + R[2, 0]) / s])
+    elif R[1, 1] > R[2, 2]:
+        s = 2.0 * np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2])
+        return np.array([(R[0, 2] - R[2, 0]) / s, (R[0, 1] + R[1, 0]) / s, 0.25 * s, (R[1, 2] + R[2, 1]) / s])
+    else:
+        s = 2.0 * np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1])
+        return np.array([(R[1, 0] - R[0, 1]) / s, (R[0, 2] + R[2, 0]) / s, (R[1, 2] + R[2, 1]) / s, 0.25 * s])
+
+
 def load_kinematics():
-    """ADAPT to the installed openarm_control API."""
-    from openarm_control import Kinematics  # noqa
-    # The MJCF ships with openarm_mujoco; point Kinematics at the OpenArm 2.0 model.
-    return Kinematics(model="openarm_v2")  # <-- verify constructor / model name
+    """Build Kinematics from the MJCF shipped with openarm_mujoco."""
+    import sys
+    from openarm_control import ArmSetup, IKParams, Kinematics
+    # openarm_mujoco installs its XML under <venv>/share/openarm_mujoco/v2/
+    xml = os.path.join(sys.prefix, "share", "openarm_mujoco", "v2", "openarm_bimanual.xml")
+    setup = ArmSetup.from_args(
+        xml=xml,
+        mode="bimanual",
+        frame_right="right_ee_control_point",
+        frame_type_right="site",
+        frame_left="left_ee_control_point",
+        frame_type_left="site",
+    )
+    return Kinematics(setup, IKParams())
 
 
 def solve_ik(kin, T_target, q_seed, side):
-    """
-    Return a 7-vector of joint angles for `side` ('right'|'left') reaching SE(3) T_target,
-    seeded with q_seed for temporal continuity, or None if IK fails.
-    ADAPT these two lines to your installed openarm_control signature (research surfaced
-    `Kinematics.solve` + `IKParams` over a daqp QP):
-    """
-    from openarm_control import IKParams  # noqa
-    q = kin.solve(target_pose=T_target, seed=q_seed, side=side, params=IKParams())
+    """Return 7-vector of joint angles or None. Uses set_target()+solve() API."""
+    p = T_target[:3, 3]
+    qwxyz = _R_to_quat_wxyz(T_target[:3, :3])
+    pose = np.array([*p, *qwxyz], dtype=np.float32)  # [px,py,pz, qw,qx,qy,qz]
+    kin.set_target(side, pose)
+    q = kin.solve()
     return None if q is None else np.asarray(q, dtype=np.float64)[:7]
 
 
 def fk_pos(kin, q, side):
     """End-effector position for joint vector q (for the reachability error check)."""
-    T = kin.fk(q, side=side)  # <-- verify fk signature
-    return np.asarray(T)[:3, 3]
+    pose = kin.fk(side, np.asarray(q, dtype=np.float32))  # returns [px,py,pz,qw,qx,qy,qz]
+    return np.asarray(pose)[:3]
 
 
 def retarget_file(path, kin):
