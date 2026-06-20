@@ -3,6 +3,10 @@
 # LeRobot is pinned to 0.3.3 because OpenArm's converter only emits v2.1.
 set -euo pipefail
 
+# Activate venv so binaries resolve correctly from any CWD
+VENV="$(dirname "$0")/.venv"
+[[ -f "${VENV}/bin/activate" ]] && source "${VENV}/bin/activate"
+
 TASK="${1:-PICK_SMALL_OBJECTS}"
 ROOT="openarm-policy/data/${TASK}"
 : "${HF_USER:?set HF_USER (your HF username / namespace for the dataset+policy repo_id)}"
@@ -11,16 +15,16 @@ OUT="${ROOT}/lerobot"
 STEPS="${STEPS:-100000}"
 
 echo "[1/3] validate OpenArmDataset"
-uv run openarm-dataset-validate "${ROOT}/openarm_dataset"
+openarm-dataset-validate "${ROOT}/openarm_dataset"
 
 echo "[2/3] convert -> LeRobotDataset v2.1  (${REPO_ID})"
-uv run openarm-dataset-convert "${ROOT}/openarm_dataset" "${OUT}" \
+openarm-dataset-convert "${ROOT}/openarm_dataset" "${OUT}" \
   --format lerobot_v2.1 --fps 30 --train-split 0.9 --success-only
 
 echo "[3/3] train ACT on $(nvidia-smi -L | wc -l) GPU(s)"
 # 2× H200 is wildly over-provisioned for ACT; single-GPU is fine. For multi-GPU:
 #   accelerate launch --multi_gpu $(command -v lerobot-train) ...
-uv run lerobot-train \
+lerobot-train \
   --dataset.repo_id="${REPO_ID}" \
   --dataset.root="${OUT}" \
   --policy.type=act \

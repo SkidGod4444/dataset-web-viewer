@@ -14,6 +14,15 @@ STAGES="${STAGES:-1 1.5 2 3 4}"
 ROOT="openarm-policy/data/${TASK}"
 has() { [[ " ${STAGES} " == *" $1 "* ]]; }
 
+# Activate the venv if present so uv run / python resolve correctly from any CWD
+VENV="$(dirname "$0")/.venv"
+if [[ -f "${VENV}/bin/activate" ]]; then
+  # shellcheck disable=SC1090
+  source "${VENV}/bin/activate"
+fi
+PYTHON="${VENV}/bin/python"
+[[ -x "${PYTHON}" ]] || PYTHON=python3
+
 if has 1; then
   echo "== Stage 1: export human takes -> EEF+grasp trajectories =="
   bun scripts/export_task.ts "${TASK}" --limit "${LIMIT}" --concurrency 8
@@ -24,11 +33,11 @@ if has 1.5; then
 fi
 if has 2; then
   echo "== Stage 2: retarget -> OpenArm joint space (needs openarm_control) =="
-  uv run python openarm-policy/retarget.py --in "${ROOT}/segments" --out "${ROOT}/retargeted" --arm auto
+  "${PYTHON}" openarm-policy/retarget.py --in "${ROOT}/segments" --out "${ROOT}/retargeted" --arm auto
 fi
 if has 3; then
   echo "== Stage 3: MuJoCo replay + re-render -> OpenArmDataset (needs openarm_mujoco) =="
-  uv run python openarm-policy/replay_sim.py --in "${ROOT}/retargeted" --out "${ROOT}" --randomize "${DR}"
+  "${PYTHON}" openarm-policy/replay_sim.py --in "${ROOT}/retargeted" --out "${ROOT}" --randomize "${DR}"
 fi
 if has 4; then
   echo "== Stage 4: convert v2.1 + train ACT =="
