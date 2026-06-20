@@ -47,12 +47,18 @@ const CONCURRENCY = parseInt(flag("concurrency", "6"), 10);
 const OUT = flag("out", "openarm-policy/data");
 
 // ---- QA + grasp tuning ----
-const CLOSE_TH = 0.03; // grasp closes when aperture < 3 cm
-const OPEN_TH = 0.05; //  grasp opens  when aperture > 5 cm  (hysteresis band)
-const SMOOTH_W = 3; //     moving-average window on aperture
-const MIN_KEPT_FRAMES = 60; // >= 2 s @ 30 fps
+// Grasp via Schmitt trigger (hysteresis) on thumb-to-nearest-finger aperture.
+// Aperture = min(thumb↔index, thumb↔middle) — middle-finger pinches register.
+// MIDDLE_TIP is optional (falls back to INDEX_TIP) because it is often occluded
+// in tight grips, and using it as a hard requirement would null-out grasp frames.
+// Dominant hand = the one with MORE grasp events, not more presence frames —
+// the non-picking hand can be more continuously tracked in bimanual takes.
+const SMOOTH_W = 3; //            moving-average window on aperture (frames)
+const CLOSE_TH = 0.03; //         close when smoothed aperture < 3 cm
+const OPEN_TH  = 0.05; //         open  when smoothed aperture > 5 cm  (hysteresis)
+const MIN_KEPT_FRAMES = 60; //    >= 2 s @ 30 fps
 const MIN_DOMINANT_RATIO = 0.5; // dominant hand present in >= 50% of kept frames
-const MIN_GRASPS = 1; // a pick must close the gripper at least once
+const MIN_GRASPS = 1; //           a pick must close the gripper at least once
 
 // MANO/MediaPipe 21-keypoint indices
 const WRIST = 0;
@@ -60,6 +66,7 @@ const THUMB_TIP = 4;
 const INDEX_MCP = 5;
 const INDEX_TIP = 8;
 const MIDDLE_MCP = 9;
+const MIDDLE_TIP = 12;
 type Vec3 = [number, number, number];
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const norm = (a: Vec3) => Math.hypot(a[0], a[1], a[2]);
@@ -121,7 +128,7 @@ function poseFromKeypoints(kp: number[][]): { pos: Vec3; quat: [number, number, 
   return { pos: w, quat: normQuat(mat2quat(R)) };
 }
 
-/** Schmitt-trigger grasp on a (smoothed) aperture series -> boolean closed. */
+/** Schmitt-trigger grasp on smoothed aperture — hysteresis avoids chatter at the threshold. */
 function hysteresisGrasp(aperture: (number | null)[]): (boolean | null)[] {
   const sm = aperture.map((_, i) => {
     const w = aperture.slice(Math.max(0, i - (SMOOTH_W - 1)), i + 1).filter((v): v is number => v != null);
@@ -204,9 +211,13 @@ async function processEpisode(ep: string, outDir: string): Promise<Row> {
     const grab = (h: any) => {
       if (!h) return { pose: null, ap: null as number | null };
       const kp = h.hand_keypoints_3d_world;
+      // Need at least THUMB_TIP(4) and INDEX_TIP(8) for aperture; poseFromKeypoints handles its own check.
       if (!kp || kp.length <= INDEX_TIP) return { pose: null, ap: null };
       const pose = poseFromKeypoints(kp);
-      const ap = norm(sub(kp[THUMB_TIP] as Vec3, kp[INDEX_TIP] as Vec3));
+      // MIDDLE_TIP may be occluded during tight grips — use it only when present, fall back to index.
+      const ap_idx = norm(sub(kp[THUMB_TIP] as Vec3, kp[INDEX_TIP] as Vec3));
+      const ap_mid = kp.length > MIDDLE_TIP ? norm(sub(kp[THUMB_TIP] as Vec3, kp[MIDDLE_TIP] as Vec3)) : Infinity;
+      const ap = Math.min(ap_idx, ap_mid);
       return { pose, ap };
     };
     const R = grab(f.right_hand), L = grab(f.left_hand);
@@ -220,9 +231,12 @@ async function processEpisode(ep: string, outDir: string): Promise<Row> {
   const Lgrasp = hysteresisGrasp(recs.map((r) => r.Lap));
   const countFlips = (g: (boolean | null)[]) => { let n = 0; for (let i = 1; i < g.length; i++) if (g[i] != null && g[i - 1] != null && g[i] !== g[i - 1]) n++; return n; };
   const Rpresent = recs.filter((r) => r.R).length, Lpresent = recs.filter((r) => r.L).length;
-  const dom = Rpresent >= Lpresent ? "right" : "left";
+  const Rflips = countFlips(Rgrasp), Lflips = countFlips(Lgrasp);
+  // Dominant = the hand that actually picks (more grasp events); break ties by presence count.
+  // Using presence count alone fails when the non-picking hand is more continuously tracked.
+  const dom = Rflips > Lflips ? "right" : Lflips > Rflips ? "left" : (Rpresent >= Lpresent ? "right" : "left");
   const domPresent = dom === "right" ? Rpresent : Lpresent;
-  const domGraspFlips = dom === "right" ? countFlips(Rgrasp) : countFlips(Lgrasp);
+  const domGraspFlips = dom === "right" ? Rflips : Lflips;
   if (domPresent / recs.length < MIN_DOMINANT_RATIO) return { ...base, status: "rejected", reason: "dominant hand too sparse", kept: recs.length, dom };
   if (domGraspFlips < MIN_GRASPS) return { ...base, status: "rejected", reason: "no grasp event", kept: recs.length, dom, grasps: domGraspFlips };
 
